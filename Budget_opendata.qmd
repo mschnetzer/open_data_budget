@@ -1,0 +1,154 @@
+---
+title: "Auswertungen des Bundesbudgets 2024"
+author: 
+  - name: Matthias Schnetzer
+    email: matthias.schnetzer@akwien.at
+    orcid: 0000-0002-1463-1271
+    url: https://mschnetzer.github.io
+date: last-modified
+abstract: |
+    Die auf data.gv.at veröffentlichten Daten zum österreichischen Bundesbudget für das Jahr 2024 erlauben rasche Auswertungen auf Detailebene. Dieses Dokument zeigt anhand einiger Beispiele mit der Statistik-Software R die Möglichkeiten auf.
+lang: de
+format:
+  html:
+    toc: true
+    toc-location: right
+editor:
+  render-on-save: true
+---
+
+## Vorbemerkung
+
+Die hier durchgeführten Auswertungen dienen lediglich der Illustration von Möglichkeiten, mit den Open Data zum Bundesbudget zu arbeiten. Alle Ergebnisse sind somit ohne Gewähr für inhaltliche Richtigkeit. Datengrundlage ist die verfügbare [CSV-Datei des Bundesbudgets auf data.gv.at](https://www.data.gv.at/katalog/dataset/c327c54d-4e61-4334-bf8b-8d73113523a3) mit Informationen über den Budgeterfolg 2022 sowie die Voranschläge für 2023 und 2024. Die Berechnungen werden mit der Statistik-Software *R* durchgeführt.
+
+## Laden von Paketen und Daten
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(gt)
+library(gtExtras)
+library(waffle)
+
+data <- read.csv2("Bund_Verzeichnis_veranschlagter_Konten_2024_mit_PA_und_GF.csv",
+ encoding = "latin1")
+```
+
+## Wieviel wendet die öffentliche Hand für *Treibstoffe* auf?
+
+#### Auflistung aller Kontostellen für Treibstoffe
+
+```{r}
+data |> filter(str_detect(TEXT_KONTO, "Treibstoffe") == T) |> 
+distinct(TEXT_KONTO)
+```
+
+#### Liste der 10 größten Budgetposten für KfZ-Treibstoffe
+
+```{r}
+data |> filter(str_detect(TEXT_KONTO, "Treibstoffe für Kraftfahrzeuge") == T, 
+EV.FV == "FV") |> 
+select(UG, TEXT_VASTELLE, TEXT_KONTO, Erfolg.2022) |> 
+summarise(Treibstoffe = sum(Erfolg.2022), .by = c(UG, TEXT_VASTELLE)) |> 
+slice_max(Treibstoffe, n = 10) |> 
+gt() |> 
+fmt_currency(column = Treibstoffe, currency="EUR", locale = "de") |> 
+gt_plt_bar(column = Treibstoffe, color = "firebrick", 
+keep_column = TRUE, width = 30)  |> 
+ cols_width(Treibstoffe ~ px(50))
+```
+
+#### Gesamtaufwand für KfZ-Treibstoffe
+
+```{r}
+total <- data |> 
+filter(str_detect(TEXT_KONTO, "Treibstoffe für Kraftfahrzeuge") == T, EV.FV == "FV") |> 
+summarise(Gesamt = sum(Erfolg.2022))
+```
+
+Der Gesamtaufwand betrug `r format(total, big.mark = ".", decimal.mark = ",")` Euro im Jahr 2022.
+
+## Was wird für *Strom*, *Gas*, und *Briefpost* aufgewendet?
+
+```{r}
+data |> filter(str_detect(TEXT_KONTO, "Strom") == T, 
+EV.FV == "FV") |> 
+select(UG, TEXT_VASTELLE, TEXT_KONTO, Erfolg.2022) |> 
+summarise(Strom = sum(Erfolg.2022), .by = c(UG, TEXT_VASTELLE)) |> 
+slice_max(Strom, n = 10) |> 
+gt() |> 
+fmt_currency(column = Strom, currency="EUR", locale = "de") |> 
+gt_plt_bar(column = Strom, color = "midnightblue", 
+keep_column = TRUE, width = 30)  |> 
+ cols_width(Strom ~ px(50))
+```
+
+Für Strom wurde insgesamt `r data |> filter(str_detect(TEXT_KONTO, "Strom") == T, EV.FV == "FV") |> summarise(Gesamt = sum(Erfolg.2022)) |> format(big.mark = ".")` Euro ausgegeben.
+
+```{r}
+data |> mutate(Gas = case_when(
+  TEXT_KONTO == "Gas" ~ Erfolg.2022,
+  str_detect(TEXT_KONTO, "Gasförmig") ~ Erfolg.2022,
+  str_detect(TEXT_KONTO, "Gas ") ~ Erfolg.2022,
+  TRUE ~ NA
+))  |> 
+filter(!is.na(Gas), EV.FV == "FV")  |> 
+summarise(Gas = sum(Gas), .by = c(UG, TEXT_VASTELLE)) |> 
+slice_max(Gas, n = 10) |> 
+gt() |> 
+fmt_currency(column = Gas, currency="EUR", locale = "de") |> 
+gt_plt_bar(column = Gas, color = "olivedrab", 
+keep_column = TRUE, width = 30)  |> 
+ cols_width(Gas ~ px(50))
+```
+
+Für Gas wurde insgesamt `r data |> mutate(Gas = case_when( TEXT_KONTO == "Gas" ~ Erfolg.2022, str_detect(TEXT_KONTO, "Gasförmig") ~ Erfolg.2022, str_detect(TEXT_KONTO, "Gas ") ~ Erfolg.2022, TRUE ~ NA)) |> filter(!is.na(Gas), EV.FV == "FV") |> summarise(Gas = sum(Gas)) |> format(big.mark = ".")` Euro ausgegeben.
+
+```{r}
+data |> filter(str_detect(TEXT_KONTO, "Briefpost") == T, 
+EV.FV == "FV") |> 
+select(UG, TEXT_VASTELLE, TEXT_KONTO, Erfolg.2022) |> 
+summarise(Briefpost = sum(Erfolg.2022), .by = c(UG, TEXT_VASTELLE)) |> 
+slice_max(Briefpost, n = 10) |> 
+gt() |> 
+fmt_currency(column = Briefpost, currency="EUR", locale = "de") |> 
+gt_plt_bar(column = Briefpost, color = "goldenrod", 
+keep_column = TRUE, width = 30)  |> 
+ cols_width(Briefpost ~ px(50))
+```
+
+Für Briefpost wurde insgesamt `r data |> filter(str_detect(TEXT_KONTO, "Briefpost") == T, EV.FV == "FV") |> summarise(Gesamt = sum(Erfolg.2022)) |> format(big.mark = ".")` Euro ausgegeben.
+
+## Bruttosteuern nach Höhe des Aufkommens 2022
+
+```{r}
+data |> filter(TEXT_VASTELLE == "Bruttosteuern", EV.FV == "FV") |> 
+select(UG, TEXT_VASTELLE, TEXT_KONTO, Erfolg.2022) |> 
+slice_max(Erfolg.2022, n = 10)  |> 
+gt() |> 
+fmt_currency(columns=Erfolg.2022, currency="EUR", locale = "de")
+```
+
+
+```{r}
+#| fig-width: 9.2
+#| fig-height: 5
+show <- data |> filter(TEXT_VASTELLE == "Bruttosteuern", EV.FV == "FV") |> 
+slice_max(Erfolg.2022, n = 6) |> pull(TEXT_KONTO)
+
+data |> filter(TEXT_VASTELLE == "Bruttosteuern", EV.FV == "FV") |>
+arrange(desc(Erfolg.2022)) |> 
+mutate(cat = fct_inorder(TEXT_KONTO),
+cat = fct_other(cat, keep = show, other_level = "Andere")) |> 
+summarise(total = sum(Erfolg.2022), .by = cat) |> 
+ggplot() +
+geom_waffle(aes(fill = cat, values = total), color = "white", size = 0.7, 
+n_rows = 5, flip = F, make_proportional = TRUE) +
+scale_fill_manual(values = MetBrewer::met.brewer("Austria"),
+name = NULL) + 
+labs(title = "Zusammensetzung der Steuereinnahmen") +
+theme_void(base_family = "Barlow Condensed", base_size = 20) +
+theme(legend.position = "bottom") + 
+theme_enhance_waffle() +
+coord_equal(expand = F)
+```
