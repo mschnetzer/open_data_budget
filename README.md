@@ -1,0 +1,1 @@
+Auswertungen der [Open Data zum Bundesbudget 2024](https://www.data.gv.at/katalog/dataset/c327c54d-4e61-4334-bf8b-8d73113523a3) für Österreich zu Anschauungszwecken und ohne Gewähr für inhaltliche Richtigkeit.
